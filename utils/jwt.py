@@ -31,3 +31,18 @@ def generate_tokens(user: User) -> Tuple[str, str]:
         raise Exception(f"Error generating tokens: {str(e)}")
 
     return access_token, refresh_token
+
+def create_access_token(user: User) -> Tuple[str, str]:
+    access_payload = {
+        "sub": str(user.id),
+        "role": user.role,
+        "iat": datetime.datetime.utcnow(),
+        "exp": datetime.datetime.utcnow() + datetime.timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    }
+
+    try:
+        access_token = jwt.encode(access_payload, SECRET_KEY, algorithm=ALGORITHM)
+    except Exception as e:
+        raise Exception(f"Error generating tokens: {str(e)}")
+
+    return access_token

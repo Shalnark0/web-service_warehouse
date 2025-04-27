@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from database.database import get_db
 from schemas.user import UserLogin, UserRegister
 from services.auth import authenticate_user, register_user
-from utils.jwt import generate_tokens
+from utils.jwt import generate_tokens, create_access_token
 from utils.security import verify_refresh_token
 from jose import JWTError
 from utils.security import verify_access_token
@@ -72,15 +72,28 @@ def refresh_token(response: Response, refresh_token: str = Cookie(None), db: Ses
     return {"message": "Access token refreshed"}
 
 @auth.get("/me")
-def auth_me(access_token: str = Cookie(None)):
-    if not access_token:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-
-    user_data = verify_access_token(access_token)
-    if not user_data:
-        raise HTTPException(status_code=401, detail="Invalid token")
-
-    return {"message": "Authenticated", "user": user_data}
+def auth_me(response: Response, access_token: str = Cookie(None), refresh_token: str = Cookie(None), db: Session = Depends(get_db)):
+    if access_token:
+        user_data = verify_access_token(access_token)
+        if user_data:
+            return {"message": "Authenticated", "user": user_data}
+    
+    if refresh_token:
+        user_data = verify_refresh_token(refresh_token, db)
+        if user_data:
+            new_access_token = create_access_token(user_data)
+            response.set_cookie(
+                key="access_token", 
+                value=new_access_token, 
+                max_age=1800,
+                httponly=True,
+                secure=False,
+                samesite="lax"
+            )
+            
+            return {"message": "Token refreshed"}
+    
+    raise HTTPException(status_code=401, detail="Not authenticated")
 
 @auth.post("/logout")
 def logout(response: Response):
